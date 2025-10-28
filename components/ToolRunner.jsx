@@ -4,6 +4,11 @@ import React, { useState, useRef, useEffect } from "react";
 // Uploads are handled by the server API at /api/tools/[tool]
 
 export default function ToolRunner({ tool }) {
+  // Simple file uploader UI + preview for a tool.
+  // - Builds FormData with files + tool + optional fields (angle/options)
+  // - Posts to /api/tools/<tool>/fileprocess
+  // - Handles JSON responses or binary responses (downloads file)
+
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
@@ -96,12 +101,45 @@ export default function ToolRunner({ tool }) {
         throw new Error(text || `Upload failed: ${res.status}`);
       }
 
-      const body = await res.json();
-      setMessage(body.message || `Uploaded ${body.files?.length || files.length} file(s) to ${tool}.`);
-      if (body.success) {
-        setFiles([]);
-        if (inputRef.current) inputRef.current.value = null;
-      }
+        // Decide how to handle the response: JSON vs binary.
+        const contentType = res.headers.get('content-type') || '';
+
+        if ((contentType || '').includes('application/json')) {
+          // Normal JSON response from the API
+          const body = await res.json();
+          setMessage(body.message || `Uploaded ${body.files?.length || files.length} file(s) to ${tool}.`);
+          if (body.success) {
+            setFiles([]);
+            if (inputRef.current) inputRef.current.value = null;
+          }
+        } else {
+          // Binary response (PDF or other). Download it.
+          const blob = await res.blob();
+          // Fallback filename: use first selected file name or default
+          let filename = files[0]?.name ? `processed-${files[0].name}` : 'downloaded-file';
+          const disp = res.headers.get('content-disposition') || '';
+          const m = /filename\*=UTF-8''(.+)$/.exec(disp) || /filename="?([^";]+)"?/.exec(disp);
+          if (m && m[1]) {
+            try {
+              filename = decodeURIComponent(m[1]);
+            } catch (e) {
+              filename = m[1];
+            }
+          }
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setMessage(`Downloaded ${filename}`);
+          // cleanup
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          setFiles([]);
+          if (inputRef.current) inputRef.current.value = null;
+        }
     } catch (err) {
       console.error(err);
       setMessage(err?.message || 'Upload failed. Try again.');
