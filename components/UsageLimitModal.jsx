@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-export default function UsageLimitModal({ open, onClose, title = 'Usage limit reached', message, upgradeUrl = '/signup' }) {
+export default function UsageLimitModal({ open, onClose, title = 'Usage limit reached', message, upgradeUrl = '/pricing' }) {
   if (!open) return null;
 
   return (
