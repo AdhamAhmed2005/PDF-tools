@@ -1,6 +1,8 @@
 export const runtime = 'nodejs';
 
 import { processFilesForTool } from '@/lib/tools/processor';
+import { canUse, incrementUsage, remaining } from '@/lib/server/usage-db';
+import { getClientInfo } from '@/actions/getClientInfo';
 
 // This route no longer writes uploaded files to disk.
 // It delegates handling to the per-tool processor under lib/tools/<tool>.js
@@ -15,6 +17,15 @@ export async function POST(request, { params }) {
 
     if (!files || !files.length) {
       return new Response(JSON.stringify({ success: false, message: 'No files uploaded' }), { status: 400 });
+    }
+
+  // Identify client by IP + token using shared helper
+  const { ip, token } = getClientInfo(request, form);
+  const LIMIT = 5;
+  const allowed = await canUse(ip, token, LIMIT);
+  const remainingBefore = await remaining(ip, token, LIMIT);
+    if (!allowed) {
+      return new Response(JSON.stringify({ success: false, message: `Usage limit exceeded (${LIMIT}).` , remaining: 0 }), { status: 429 });
     }
 
     try {
@@ -34,6 +45,19 @@ export async function POST(request, { params }) {
       if (result && result.success) {
         const payload = result.result;
 
+        // Increment usage now that processing succeeded
+        try {
+          const rec = await incrementUsage(ip, token);
+          // expose remaining uses in header when possible
+          const rem = Math.max(0, LIMIT - (rec.count || 0));
+          // attach as `X-Usage-Remaining` header below where applicable
+          // (for JSON responses we'll include it in the body; for binary downloads
+          // we attach a response header)
+          result.usage = { remaining: rem, limit: LIMIT };
+        } catch (e) {
+          console.error('usage-db error', e);
+        }
+
         // If the processor returned a direct download buffer for a single file, stream it back
         if (payload && payload.download && payload.buffer) {
           const filename = payload.filename || 'output';
@@ -41,12 +65,15 @@ export async function POST(request, { params }) {
           const headers = {
             'Content-Type': contentType,
             'Content-Disposition': `attachment; filename="${filename}"`,
+            'X-Usage-Limit': String(LIMIT),
+            'X-Usage-Remaining': String(result?.usage?.remaining ?? remainingBefore),
           };
           // payload.buffer should be a Node Buffer or Uint8Array
           return new Response(payload.buffer, { status: 200, headers });
         }
 
-        return new Response(JSON.stringify({ success: true, message: result.message || 'Processing completed', result: payload }), { status: 200 });
+        // JSON response: include remaining uses
+        return new Response(JSON.stringify({ success: true, message: result.message || 'Processing completed', result: payload, usage: result?.usage || { remaining: remainingBefore, limit: LIMIT } }), { status: 200 });
       }
 
       // If no processor was found or it chose not to process synchronously, return 202 Accepted with explanation
