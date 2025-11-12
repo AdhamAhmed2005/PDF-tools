@@ -65,7 +65,7 @@ const ToolCard = ({
             </span>
         )}
       </h3>
-      
+  
       <p className="text-sm text-gray-500 text-center">
         {description}
       </p>
