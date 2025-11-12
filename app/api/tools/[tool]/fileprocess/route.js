@@ -3,6 +3,8 @@ export const runtime = 'nodejs';
 import { processFilesForTool } from '@/lib/tools/processor';
 import { canUse, incrementUsage, remaining } from '@/lib/server/usage-db';
 import { getClientInfo } from '@/actions/getClientInfo';
+import { getConnection } from '@/lib/database';
+import sql from 'mssql';
 
 export async function POST ( request, { params } ) {
   try
@@ -36,7 +38,8 @@ export async function POST ( request, { params } ) {
       }
       if ( angleField && !options.angle ) options.angle = Number( angleField );
 
-      const result = await processFilesForTool( tool, files, options );
+  const result = await processFilesForTool( tool, files, options );
+  const payload = result?.result;
 
       let toolId = null;
       try
@@ -67,15 +70,12 @@ export async function POST ( request, { params } ) {
       {
         console.error( 'User_Actions insert error:', dbErr );
       }
-
+      // Only proceed if processing succeeded
+      if (result && result.success) {
         // Increment usage now that processing succeeded
         try {
           const rec = await incrementUsage(ip, token);
-          // expose remaining uses in header when possible
           const rem = Math.max(0, LIMIT - (rec.count || 0));
-          // attach as `X-Usage-Remaining` header below where applicable
-          // (for JSON responses we'll include it in the body; for binary downloads
-          // we attach a response header)
           result.usage = { remaining: rem, limit: LIMIT };
         } catch (e) {
           console.error('usage-db error', e);
@@ -92,12 +92,10 @@ export async function POST ( request, { params } ) {
             const filename = payload.filename || 'output';
             const contentType = payload.contentType || 'application/octet-stream';
 
-            // Create tmp dir under uploads/tmp
             const cwd = process.cwd();
             const tmpDir = path.join(cwd, 'uploads', 'tmp');
             await mkdir(tmpDir, { recursive: true });
 
-            // Generate random id and store binary + metadata
             const id = crypto.randomBytes(12).toString('hex');
             const binPath = path.join(tmpDir, `${id}.bin`);
             const metaPath = path.join(tmpDir, `${id}.json`);
@@ -119,7 +117,6 @@ export async function POST ( request, { params } ) {
             );
           } catch (persistErr) {
             console.error('Error persisting temp download file', persistErr);
-            // Fallback to previous behavior (stream) if persistence fails
             const filename = payload.filename || 'output';
             const contentType = payload.contentType || 'application/octet-stream';
             const headers = {
@@ -134,10 +131,22 @@ export async function POST ( request, { params } ) {
         }
 
         // JSON response: include remaining uses
-        return new Response(JSON.stringify({ success: true, message: result.message || 'Processing completed', result: payload, usage: result?.usage || { remaining: remainingBefore, limit: LIMIT } }), { status: 200 });
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: result.message || 'Processing completed',
+            result: payload,
+            usage: result?.usage || { remaining: remainingBefore, limit: LIMIT },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
       }
 
-      return new Response( JSON.stringify( { success: false, message: result?.message || 'No processor for this tool; processing not performed' } ), { status: 202 } );
+      // If no processor was found or it failed
+      return new Response(
+        JSON.stringify({ success: false, message: result?.message || 'No processor for this tool; processing not performed' }),
+        { status: 202 }
+      );
     } catch ( err )
     {
       console.error( 'Processor error:', err );

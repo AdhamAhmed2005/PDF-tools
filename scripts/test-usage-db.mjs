@@ -1,4 +1,4 @@
-import { getUsage, incrementUsage, canUse, remaining } from '../lib/server/usage-db.js';
+import { incrementUsage, canUse, remaining } from '../lib/server/usage-db.js';
 
 async function run() {
   const ip = '127.0.0.1';

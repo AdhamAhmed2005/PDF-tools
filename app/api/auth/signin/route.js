@@ -1,4 +1,4 @@
-import { getConnection } from '../../../../lib/tools/database';
+import { getConnection } from '@/lib/database';
 import sql from 'mssql';
 import bcrypt from 'bcryptjs';
 
