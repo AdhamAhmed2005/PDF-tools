@@ -23,24 +23,37 @@ export default function SigninForm() {
     setErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const eobj = validate();
-    setErrors(eobj);
-    if (Object.keys(eobj).length) return;
-    setSubmitting(true);
-    try {
-      // Placeholder: swap with real auth call
-      await new Promise((r) => setTimeout(r, 700));
-      console.log('Signin payload:', { email: form.email, remember: form.remember });
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  const eobj = validate();
+  setErrors(eobj);
+  if (Object.keys(eobj).length) return;
+  setSubmitting(true);
+  try {
+    const res = await fetch('/api/auth/signin', {
+      method: 'POST',
+      body: new URLSearchParams({
+        email: form.email,
+        password: form.password
+      }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
+    const data = await res.json();
+    if (data.success) {
       setSuccess(true);
       setForm({ email: '', password: '', remember: false });
-    } catch (err) {
-      setErrors({ form: 'Something went wrong. Please try again.' });
-    } finally {
-      setSubmitting(false);
+    } else {
+      setErrors({ form: data.message || 'Login failed' });
     }
-  };
+  } catch (err) {
+    setErrors({ form: 'Something went wrong. Please try again.' });
+  } finally {
+    setSubmitting(false);
+  }
+};
+
 
   return (
     <>
