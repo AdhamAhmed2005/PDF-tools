@@ -3,22 +3,19 @@ import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import ProgressBar from './ProgressBar';
 
-// Enhanced file upload component with progress tracking
+// Simple file upload component - only handles upload, then redirects to result page
 // Props:
 // - tool: string (tool name like 'rotate-pdf')
-// - onComplete?: function called when processing is done
 // - accept?: string (file types to accept)
 // - multiple?: boolean (allow multiple files)
 export default function FileUploadWithProgress({ 
   tool, 
-  onComplete, 
   accept = '.pdf', 
   multiple = false 
 }) {
-  const [state, setState] = useState('idle'); // 'idle' | 'uploading' | 'converting' | 'complete' | 'error'
+  const [state, setState] = useState('idle');
   const [progress, setProgress] = useState(0);
   const [fileName, setFileName] = useState('');
-  const [message, setMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const fileInputRef = useRef(null);
   const router = useRouter();
@@ -34,80 +31,53 @@ export default function FileUploadWithProgress({
   const uploadFiles = async () => {
     if (selectedFiles.length === 0) return;
 
+    console.log('Upload function called, files:', selectedFiles);
+
     try {
+      console.log('Setting state to uploading...'); 
       setState('uploading');
       setProgress(0);
-      setMessage('');
 
-      const formData = new FormData();
-      selectedFiles.forEach(file => formData.append('files', file));
-      formData.append('tool', tool);
-
-      // Create XMLHttpRequest to track upload progress
-      const xhr = new XMLHttpRequest();
-      
-      // Track upload progress
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const uploadProgress = Math.round((event.loaded / event.total) * 100);
-          setProgress(uploadProgress);
-        }
-      });
-
-      // Handle response
-      const responsePromise = new Promise((resolve, reject) => {
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              resolve(JSON.parse(xhr.responseText));
-            } catch (e) {
-              reject(new Error('Invalid response format'));
-            }
-          } else {
-            reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
-          }
-        });
-        
-        xhr.addEventListener('error', () => {
-          reject(new Error('Upload failed'));
-        });
-      });
-
-      // Start upload
-      xhr.open('POST', `/api/tools/${tool}/fileprocess`);
-      xhr.send(formData);
-
-      // Wait for upload to complete
-      setState('converting');
-      setProgress(0);
-      
-      const result = await responsePromise;
-      
-      if (result.success) {
-        setState('complete');
-        setProgress(100);
-        setMessage('Processing complete!');
-        
-        // Redirect to result page after a brief delay
-        setTimeout(() => {
-          if (result.result?.downloadUrl) {
-            const params = new URLSearchParams({
-              status: 'success',
-              filename: fileName,
-              url: result.result.downloadUrl
-            });
-            router.push(`/result?${params.toString()}`);
-          } else {
-            onComplete?.(result);
-          }
-        }, 1500);
-      } else {
-        throw new Error(result.message || 'Processing failed');
+      console.log('Starting progress simulation...');
+      // Simulate upload progress more visibly
+      for (let i = 0; i <= 100; i += 5) {
+        console.log(`Progress: ${i}%`);
+        setProgress(i);
+        await new Promise(resolve => setTimeout(resolve, 50)); // Faster updates
       }
+
+      console.log('Upload complete, converting to base64...'); 
+      
+      // Convert file to base64 for preview (temporary approach)
+      const file = selectedFiles[0];
+      console.log('Processing file:', file.name, file.size);
+      
+      const arrayBuffer = await file.arrayBuffer();
+      console.log('ArrayBuffer created, length:', arrayBuffer.byteLength);
+      
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      console.log('Base64 conversion complete, length:', base64.length);
+      
+      // Store in sessionStorage to avoid URL length issues
+      const sessionId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('Storing in sessionStorage with ID:', sessionId);
+      
+      sessionStorage.setItem(sessionId, JSON.stringify({
+        filename: file.name,
+        tool: tool,
+        data: base64,
+        size: file.size,
+        contentType: file.type || 'application/pdf'
+      }));
+      
+      // Redirect to result page with session reference
+      const redirectUrl = `/result?status=uploaded&session=${sessionId}`;
+      
+      router.push(redirectUrl);
+      
     } catch (error) {
       console.error('Upload error:', error);
       setState('error');
-      setMessage(error.message || 'Upload failed. Please try again.');
     }
   };
 
@@ -115,7 +85,6 @@ export default function FileUploadWithProgress({
     setState('idle');
     setProgress(0);
     setFileName('');
-    setMessage('');
     setSelectedFiles([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -132,15 +101,15 @@ export default function FileUploadWithProgress({
           accept={accept}
           multiple={multiple}
           onChange={handleFileSelect}
-          disabled={state === 'uploading' || state === 'converting'}
+          disabled={state === 'uploading'}
           className="hidden"
           id="file-input"
         />
         <label
           htmlFor="file-input"
           className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-            state === 'uploading' || state === 'converting'
-              ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+            state === 'uploading'
+              ? 'border-blue-400 bg-blue-50 cursor-not-allowed'
               : selectedFiles.length > 0
               ? 'border-green-400 bg-green-50 hover:bg-green-100'
               : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
@@ -166,34 +135,53 @@ export default function FileUploadWithProgress({
         </label>
       </div>
 
-      {/* Progress bar */}
-      <ProgressBar 
-        state={state}
-        progress={progress}
-        fileName={fileName}
-        message={message}
-      />
+      {/* Progress bar - always show for debugging when not idle */}
+      {state !== 'idle' && (
+        <div className="mb-4">
+          <div className="text-sm font-medium text-gray-700 mb-2">
+            State: {state} | Progress: {progress}%
+          </div>
+          <ProgressBar 
+            state={state}
+            progress={progress}
+            fileName={fileName}
+          />
+        </div>
+      )}
 
       {/* Action buttons */}
       <div className="flex gap-3">
         <button
-          onClick={uploadFiles}
-          disabled={selectedFiles.length === 0 || state === 'uploading' || state === 'converting'}
+          onClick={() => {
+            console.log('Button clicked! State:', state, 'Files:', selectedFiles.length);
+            uploadFiles();
+          }}
+          disabled={selectedFiles.length === 0 || state === 'uploading'}
           className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
-          {state === 'uploading' ? 'Uploading...' : 
-           state === 'converting' ? 'Converting...' : 
-           'Start Processing'}
+          {state === 'uploading' ? 'Uploading...' : 'Upload File'}
         </button>
         
-        {(state === 'error' || state === 'complete') && (
+        {state === 'error' && (
           <button
             onClick={reset}
             className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
           >
-            Upload Another
+            Try Again
           </button>
         )}
+        
+        {/* Debug button */}
+        <button
+          onClick={() => {
+            console.log('Debug - Current state:', { state, progress, fileName, selectedFiles });
+            setState('uploading');
+            setProgress(50);
+          }}
+          className="px-3 py-2 bg-gray-200 text-gray-700 rounded text-xs"
+        >
+          Test
+        </button>
       </div>
     </div>
   );

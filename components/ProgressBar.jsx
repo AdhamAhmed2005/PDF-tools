@@ -50,7 +50,11 @@ export default function ProgressBar({ state = 'idle', progress = 0, fileName, me
   const stateInfo = getStateInfo();
 
   if (!stateInfo || state === 'idle') {
-    return null; // Don't show anything when idle
+    return (
+      <div className="text-red-500 text-sm">
+        Debug: ProgressBar called with state="{state}" but no stateInfo found
+      </div>
+    );
   }
 
   const displayProgress = stateInfo.showProgress ? progress : 100;

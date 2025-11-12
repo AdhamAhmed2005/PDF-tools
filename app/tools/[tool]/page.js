@@ -1,4 +1,4 @@
-import ToolRunner from '@/components/ToolRunner';
+import FileUploadWithProgress from '@/components/FileUploadWithProgress';
 
 const ToolPage = async ({ params }) => {
 const resolvedParams = await params;       
@@ -12,7 +12,7 @@ const tool = resolvedParams?.tool || 'unknown';
                     <p className="mt-2 text-sm text-gray-600">Upload files and apply the <span className="font-medium text-teal-600">{tool}</span> tool.</p>
                 </header>
 
-                <ToolRunner tool={tool} />
+                <FileUploadWithProgress tool={tool} accept=".pdf" multiple={true} />
             </div>
         </div>
     );

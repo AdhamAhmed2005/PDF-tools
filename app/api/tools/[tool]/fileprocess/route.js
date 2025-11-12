@@ -54,21 +54,24 @@ export async function POST ( request, { params } ) {
         toolId = null;
       }
 
-      try
-      {
-        const pool = await getConnection();
-        await pool.request()
-          .input( 'userId', sql.Int, userId ? Number( userId ) : null )
-          .input( 'toolId', sql.Int, toolId )
-          .input( 'timestamp', sql.DateTime, new Date() )
-          .input( 'status', sql.NVarChar, result?.success ? 'completed' : 'failed' )
-          .query( `
-            INSERT INTO User_Actions (user_id, tool_id, timestamp, status)
-            VALUES (@userId, @toolId, @timestamp, @status)
-          `);
-      } catch ( dbErr )
-      {
-        console.error( 'User_Actions insert error:', dbErr );
+      // Log user action only if we have a valid user_id and tool_id
+      if (userId && toolId) {
+        try
+        {
+          const pool = await getConnection();
+          await pool.request()
+            .input( 'userId', sql.Int, Number( userId ) )
+            .input( 'toolId', sql.Int, toolId )
+            .input( 'timestamp', sql.DateTime, new Date() )
+            .input( 'status', sql.NVarChar, result?.success ? 'completed' : 'failed' )
+            .query( `
+              INSERT INTO User_Actions (user_id, tool_id, timestamp, status)
+              VALUES (@userId, @toolId, @timestamp, @status)
+            `);
+        } catch ( dbErr )
+        {
+          console.error( 'User_Actions insert error:', dbErr );
+        }
       }
       // Only proceed if processing succeeded
       if (result && result.success) {

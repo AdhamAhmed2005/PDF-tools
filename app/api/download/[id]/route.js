@@ -37,7 +37,8 @@ async function cleanupOld() {
 }
 
 export async function GET(request, { params }) {
-  const { id } = params || {};
+    const modParams = await params
+  const { id } = modParams || {};
   if (!id) {
     return new Response(JSON.stringify({ success: false, message: 'Missing id' }), { status: 400 });
   }
