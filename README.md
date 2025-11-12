@@ -2,40 +2,133 @@
 
 # PDF-tools (Next.js)
 
-A small collection of focused PDF utilities built with Next.js (app directory). The project provides a set of tiny tools, a client-side file uploader UI, and server API routes to receive files and run per-tool processing.
+A collection of PDF utilities built with Next.js (app directory) featuring ARB Payment Gateway integration for premium subscriptions.
 
-This README explains how to run the project locally, the file upload flow, where uploaded files land, and recommended next steps for production/hardening.
+## Features
+
+- **PDF Tools**: Compress, rotate, merge, and split PDF files
+- **Usage Limits**: Free users get 5 uses per tool, tracked by IP + token
+- **Premium Plans**: Unlimited access via ARB Payment Gateway integration
+- **Secure Payments**: AES-256-CBC encrypted payment flow with Al Rajhi Bank
+- **File-based Storage**: Simple JSON databases for usage and order tracking
 
 ## Quick start
 
-1. Install dependencies
+1. **Install dependencies**
 
 ```bash
 npm install
-# or: pnpm install
 ```
 
-2. Run development server
+2. **Set up environment variables**
+
+Copy `.env.example` to `.env.local` and fill in your ARB Payment Gateway credentials:
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local`:
+```env
+ARB_RESOURCE_KEY=your_resource_key_here
+ARB_MERCHANT_ID=your_merchant_id_here
+ARB_PASSWORD=your_password_here
+ARB_API_URL=https://securepayments.alrajhibank.com.sa/pg/payment/hosted.htm
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+```
+
+3. **Run development server**
 
 ```bash
 npm run dev
-# opens on http://localhost:3000 by default
+# opens on http://localhost:3000
 ```
 
-3. Open a tool page in your browser to test uploads:
+## Project Structure
 
-- Example: `http://localhost:3000/tools/merge`
+### Core Directories
 
-## Project layout (important files)
+- `app/` — Next.js app routes and pages
+  - `app/tools/[tool]/page.js` — Individual tool pages
+  - `app/api/tools/[tool]/fileprocess/route.js` — File processing API
+  - `app/api/payment/` — Payment gateway endpoints
+  - `app/payment/` — Payment response handlers
+  - `app/pricing/` — Pricing page with payment integration
+- `components/` — React components
+  - `ToolRunner.jsx` — File upload UI with usage limit handling
+  - `UsageLimitModal.jsx` — Modal for upgrade prompts
+- `lib/` — Business logic
+  - `lib/tools/` — PDF processing tools (using pdf-lib)
+  - `lib/server/usage-db.js` — Usage tracking with premium bypass
+  - `lib/payment/arb-gateway.js` — ARB Payment Gateway integration
+- `data/` — JSON databases
+  - `data/usage.json` — Usage tracking per IP+token
+  - `data/orders.json` — Payment orders and transaction status
+  - `data/plans.js` — Pricing plan definitions
 
-- `app/` — Next.js app routes (pages + layout)
-  - `app/tools/[tool]/page.js` — tool page (server-rendered) which mounts the client upload UI
-  - `app/api/tools/[tool]/fileprocess/route.js` — API endpoint that accepts uploads for a given tool
-- `components/ToolRunner.jsx` — client uploader (drag & drop, file list, preview, upload)
-- `actions/uploadFile.js` — helper used by the API to write uploaded files to disk
-- `public/uploads/` and `uploads/` — directories where uploaded files may be stored (fallback vs helper)
+## Payment Flow
 
-## File upload flow (end-to-end)
+### 1. User Initiates Payment
+
+User clicks "Upgrade Now" on pricing page (`/pricing`):
+
+```javascript
+// Client-side code in app/pricing/page.js
+const response = await fetch('/api/payment/create-order', {
+  method: 'POST',
+  body: JSON.stringify({ planName: 'Premium', amount: 9 })
+});
+
+const { paymentUrl } = await response.json();
+window.location.href = paymentUrl; // Redirect to ARB gateway
+```
+
+### 2. Payment Processing
+
+Backend creates order and generates payment token:
+
+```javascript
+// app/api/payment/create-order/route.js
+import { generatePaymentToken } from '@/lib/payment/arb-gateway';
+
+// 1. Generate unique trackId
+// 2. Encrypt payment data with AES-256-CBC
+// 3. Call ARB API to get payment URL
+// 4. Save order to data/orders.json
+// 5. Return paymentUrl to client
+```
+
+### 3. Payment Response Handling
+
+ARB redirects back to your app:
+
+- **Success**: `/payment/response?paymentId=xxx&trackId=xxx`
+  - Calls `/api/payment/verify` to confirm transaction
+  - Updates order status to APPROVED
+  - Grants unlimited access to user
+  - Redirects to tools page
+
+- **Failure**: `/payment/error?errorCode=xxx&errorText=xxx`
+  - Displays error message
+  - Provides retry option
+
+### 4. Premium Access
+
+Usage limit check bypasses premium users:
+
+```javascript
+// lib/server/usage-db.js
+async function canUse(ip, token) {
+  const isPremium = await checkPremiumStatus(ip, token);
+  if (isPremium) return true; // Unlimited access
+  
+  // Free users: check usage count
+  const usage = await getUsage(ip, token);
+  return usage.count < 5;
+}
+```
+
+## File Upload Flow
 
 1. User visits a tool page (e.g. `/tools/merge`). The server renders `app/tools/[tool]/page.js` which includes the `ToolRunner` client component.
 2. The user selects or drags files into `ToolRunner`. The component shows a preview (client-side blob URL) and a list of selected files.

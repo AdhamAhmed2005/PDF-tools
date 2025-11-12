@@ -58,18 +58,56 @@ export async function POST(request, { params }) {
           console.error('usage-db error', e);
         }
 
-        // If the processor returned a direct download buffer for a single file, stream it back
+        // If the processor returned a direct download buffer for a single file,
+        // instead of streaming immediately, persist temporarily and return a JSON downloadUrl
         if (payload && payload.download && payload.buffer) {
-          const filename = payload.filename || 'output';
-          const contentType = payload.contentType || 'application/octet-stream';
-          const headers = {
-            'Content-Type': contentType,
-            'Content-Disposition': `attachment; filename="${filename}"`,
-            'X-Usage-Limit': String(LIMIT),
-            'X-Usage-Remaining': String(result?.usage?.remaining ?? remainingBefore),
-          };
-          // payload.buffer should be a Node Buffer or Uint8Array
-          return new Response(payload.buffer, { status: 200, headers });
+          try {
+            const { writeFile, mkdir } = await import('node:fs/promises');
+            const path = await import('node:path');
+            const crypto = await import('node:crypto');
+
+            const filename = payload.filename || 'output';
+            const contentType = payload.contentType || 'application/octet-stream';
+
+            // Create tmp dir under uploads/tmp
+            const cwd = process.cwd();
+            const tmpDir = path.join(cwd, 'uploads', 'tmp');
+            await mkdir(tmpDir, { recursive: true });
+
+            // Generate random id and store binary + metadata
+            const id = crypto.randomBytes(12).toString('hex');
+            const binPath = path.join(tmpDir, `${id}.bin`);
+            const metaPath = path.join(tmpDir, `${id}.json`);
+
+            const buf = Buffer.isBuffer(payload.buffer) ? payload.buffer : Buffer.from(payload.buffer);
+            await writeFile(binPath, buf);
+            await writeFile(metaPath, JSON.stringify({ filename, contentType, size: buf.length, createdAt: Date.now() }));
+
+            const downloadUrl = `/api/download/${id}`;
+
+            return new Response(
+              JSON.stringify({
+                success: true,
+                message: result.message || 'Processing completed',
+                result: { downloadUrl, filename, contentType, size: buf.length },
+                usage: result?.usage || { remaining: remainingBefore, limit: LIMIT },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            );
+          } catch (persistErr) {
+            console.error('Error persisting temp download file', persistErr);
+            // Fallback to previous behavior (stream) if persistence fails
+            const filename = payload.filename || 'output';
+            const contentType = payload.contentType || 'application/octet-stream';
+            const headers = {
+              'Content-Type': contentType,
+              'Content-Disposition': `attachment; filename="${filename}"`,
+              'X-Usage-Limit': String(LIMIT),
+              'X-Usage-Remaining': String(result?.usage?.remaining ?? remainingBefore),
+            };
+            const data = Buffer.isBuffer(payload.buffer) ? payload.buffer : Buffer.from(payload.buffer);
+            return new Response(data, { status: 200, headers });
+          }
         }
 
         // JSON response: include remaining uses
