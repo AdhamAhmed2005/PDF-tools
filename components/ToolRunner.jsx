@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import UsageLimitModal from './UsageLimitModal';
 // Uploads are handled by the server API at /api/tools/[tool]
 
 export default function ToolRunner({ tool }) {
@@ -96,6 +97,17 @@ export default function ToolRunner({ tool }) {
         body: fd,
       });
 
+      // Handle usage limit (429) specially and show a modal prompting upgrade
+      if (res.status === 429) {
+        let body = null;
+        try { body = await res.json(); } catch (e) { body = { message: 'Usage limit exceeded' }; }
+        setMessage(body.message || 'Usage limit exceeded.');
+        setUsageInfo(body);
+        setUsageModalOpen(true);
+        setUploading(false);
+        return;
+      }
+
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || `Upload failed: ${res.status}`);
@@ -108,6 +120,12 @@ export default function ToolRunner({ tool }) {
           // Normal JSON response from the API
           const body = await res.json();
           setMessage(body.message || `Uploaded ${body.files?.length || files.length} file(s) to ${tool}.`);
+          // If API returned usage info, show a small notification (optional)
+          if (body.usage && body.usage.remaining !== undefined) {
+            // you could display this somewhere in the UI; for now just set a message
+            const rem = body.usage.remaining;
+            setMessage((prev) => `${prev} (${rem} uses remaining)`);
+          }
           if (body.success) {
             setFiles([]);
             if (inputRef.current) inputRef.current.value = null;
@@ -147,6 +165,10 @@ export default function ToolRunner({ tool }) {
       setUploading(false);
     }
   };
+
+  // Usage modal state
+  const [usageModalOpen, setUsageModalOpen] = useState(false);
+  const [usageInfo, setUsageInfo] = useState(null);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -272,6 +294,14 @@ export default function ToolRunner({ tool }) {
 
       {/* Feedback Message */}
       {message && <div className="mt-4 text-sm text-gray-700">{message}</div>}
+      {/* Usage limit modal */}
+      <UsageLimitModal
+        open={usageModalOpen}
+        onClose={() => setUsageModalOpen(false)}
+        title={usageInfo?.title || 'Usage limit reached'}
+        message={usageInfo?.message || (usageInfo?.error || 'You have reached the free usage limit for this tool. Upgrade to premium to continue using this tool without limits.')}
+        upgradeUrl={usageInfo?.upgradeUrl || '/signup'}
+      />
     </div>
   );
 }
