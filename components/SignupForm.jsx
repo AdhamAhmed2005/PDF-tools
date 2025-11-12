@@ -27,23 +27,38 @@ export default function SignupForm() {
     setErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const eobj = validate();
-    setErrors(eobj);
-    if (Object.keys(eobj).length) return;
-    setSubmitting(true);
-    try {
-      await new Promise((r) => setTimeout(r, 900));
-      console.log('Signup payload:', { name: form.name, email: form.email });
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  const eobj = validate();
+  setErrors(eobj);
+  if (Object.keys(eobj).length) return;
+  setSubmitting(true);
+  try {
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      body: new URLSearchParams({
+        username: form.name,  
+        email: form.email,
+        password: form.password
+      }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
+    const data = await res.json();
+    if (data.success) {
       setSuccess(true);
       setForm({ name: '', email: '', password: '', confirm: '', accept: false });
-    } catch (err) {
-      setErrors({ form: 'Something went wrong. Please try again.' });
-    } finally {
-      setSubmitting(false);
+    } else {
+      setErrors({ form: data.message || 'Signup failed' });
     }
-  };
+  } catch (err) {
+    setErrors({ form: 'Something went wrong. Please try again.' });
+  } finally {
+    setSubmitting(false);
+  }
+};
+
 
   return (
     <>
