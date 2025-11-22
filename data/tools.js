@@ -63,6 +63,13 @@ const tools = [
     color: 'word',
   },
   {
+    icon: RectangleGroupIcon,
+    title: 'PDF to Excel',
+    description: 'Extract tables to XLSX.',
+    href: '/tools/pdf-to-excel',
+    color: 'excel',
+  },
+  {
     icon: PhotoIcon,
     title: 'PDF to JPG',
     description: 'Export PDF pages as images.',

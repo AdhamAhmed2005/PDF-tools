@@ -46,34 +46,127 @@ export default function FileUploadWithProgress({
         await new Promise(resolve => setTimeout(resolve, 50)); // Faster updates
       }
 
-      console.log('Upload complete, converting to base64...'); 
+      console.log('Upload complete, processing file...'); 
       
-      // Convert file to base64 for preview (temporary approach)
+      // Process file directly without sessionStorage to avoid quota issues
       const file = selectedFiles[0];
       console.log('Processing file:', file.name, file.size);
       
+      // Check file size - if too large, process directly
+      const maxSessionStorageSize = 4 * 1024 * 1024; // 4MB limit for sessionStorage
+      
+      if (file.size > maxSessionStorageSize) {
+        console.log('File too large for sessionStorage, processing directly...');
+        
+        // For large files, send directly to conversion API
+        setState('converting');
+        setProgress(0);
+        
+        try {
+          const formData = new FormData();
+          formData.append('files', file);
+          formData.append('tool', tool);
+          
+          const response = await fetch(`/api/tools/${tool}/fileprocess`, {
+            method: 'POST',
+            body: formData,
+          });
+          
+          const result = await response.json();
+          
+          if (result.success && result.result?.downloadUrl) {
+            setProgress(100);
+            setState('complete');
+            
+            // Redirect to success page
+            setTimeout(() => {
+              const params = new URLSearchParams({
+                status: 'success',
+                filename: file.name,
+                url: result.result.downloadUrl
+              });
+              router.push(`/result?${params.toString()}`);
+            }, 1000);
+          } else {
+            throw new Error(result.message || 'Conversion failed');
+          }
+        } catch (conversionError) {
+          console.error('Direct conversion error:', conversionError);
+          setState('error');
+          return;
+        }
+        
+        return; // Exit early for direct processing
+      }
+      
+      // For smaller files, use sessionStorage approach
       const arrayBuffer = await file.arrayBuffer();
       console.log('ArrayBuffer created, length:', arrayBuffer.byteLength);
       
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      // Convert ArrayBuffer to base64 safely for large files
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = '';
+      const chunkSize = 8192; // Process in chunks to avoid stack overflow
+      
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, chunk);
+      }
+      
+      const base64 = btoa(binary);
       console.log('Base64 conversion complete, length:', base64.length);
       
-      // Store in sessionStorage to avoid URL length issues
+      // Try to store in sessionStorage with error handling
       const sessionId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       console.log('Storing in sessionStorage with ID:', sessionId);
       
-      sessionStorage.setItem(sessionId, JSON.stringify({
-        filename: file.name,
-        tool: tool,
-        data: base64,
-        size: file.size,
-        contentType: file.type || 'application/pdf'
-      }));
-      
-      // Redirect to result page with session reference
-      const redirectUrl = `/result?status=uploaded&session=${sessionId}`;
-      
-      router.push(redirectUrl);
+      try {
+        sessionStorage.setItem(sessionId, JSON.stringify({
+          filename: file.name,
+          tool: tool,
+          data: base64,
+          size: file.size,
+          contentType: file.type || 'application/pdf'
+        }));
+        
+        // Redirect to result page with session reference
+        const redirectUrl = `/result?status=uploaded&session=${sessionId}`;
+        router.push(redirectUrl);
+        
+      } catch (storageError) {
+        console.warn('SessionStorage failed, falling back to direct processing:', storageError);
+        
+        // Fallback to direct processing if sessionStorage fails
+        setState('converting');
+        setProgress(0);
+        
+        const formData = new FormData();
+        formData.append('files', file);
+        formData.append('tool', tool);
+        
+        const response = await fetch(`/api/tools/${tool}/fileprocess`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.result?.downloadUrl) {
+          setProgress(100);
+          setState('complete');
+          
+          setTimeout(() => {
+            const params = new URLSearchParams({
+              status: 'success',
+              filename: file.name,
+              url: result.result.downloadUrl
+            });
+            router.push(`/result?${params.toString()}`);
+          }, 1000);
+        } else {
+          throw new Error(result.message || 'Conversion failed');
+        }
+      }
       
     } catch (error) {
       console.error('Upload error:', error);
@@ -156,10 +249,10 @@ export default function FileUploadWithProgress({
             console.log('Button clicked! State:', state, 'Files:', selectedFiles.length);
             uploadFiles();
           }}
-          disabled={selectedFiles.length === 0 || state === 'uploading'}
+          disabled={selectedFiles.length === 0 || state === 'uploading' || state === 'converting'}
           className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
-          {state === 'uploading' ? 'Uploading...' : 'Upload File'}
+          {state === 'uploading' ? 'Uploading...' : state === 'converting' ? 'Converting...' : 'Upload File'}
         </button>
         
         {state === 'error' && (
