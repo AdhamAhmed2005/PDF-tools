@@ -172,7 +172,6 @@ const tools = [
     href: '/tools/sign-pdf',
     color: 'edit',
   },
-
   {
     icon: YouTubeIcon,
     title: 'Download from YouTube',
