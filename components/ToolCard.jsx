@@ -9,6 +9,7 @@ const COLOR_MAP = {
   word: 'bg-indigo-600 text-white',
   edit: 'bg-green-600 text-white',
   utility: 'bg-gray-700 text-white',
+  download: 'bg-red-600 text-white',
 };
 
 const ToolCard = ({
