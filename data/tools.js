@@ -26,6 +26,23 @@ import {
   CameraIcon,
 } from '@heroicons/react/24/outline';
 
+
+const YouTubeIcon = ( props ) => (
+  <svg
+    { ...props }
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={ 2 }
+    stroke="currentColor"
+    className="w-6 h-6"
+  >
+    <rect x="2" y="5" width="20" height="14" rx="4" ry="4" stroke="#FF0000" strokeWidth={ 2 } fill="#FF0000" />
+    <path d="M10 8l6 4-6 4V8z" fill="white" />
+  </svg>
+);
+
+
 const tools = [
   {
     icon: ArrowDownOnSquareStackIcon,
@@ -155,6 +172,15 @@ const tools = [
     href: '/tools/sign-pdf',
     color: 'edit',
   },
+
+  {
+    icon: YouTubeIcon,
+    title: 'Download from YouTube',
+    description: 'Download videos directly from YouTube.',
+    href: '/tools/download-youtube',
+    color: 'download',
+  }
+
 
   // Advanced / Professional (Premium)
   // {
