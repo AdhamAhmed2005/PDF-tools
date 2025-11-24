@@ -27,7 +27,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 
-const YouTubeIcon = ( props ) => (
+const TikTokIcon = ( props ) => (
   <svg
     { ...props }
     xmlns="http://www.w3.org/2000/svg"
@@ -37,8 +37,7 @@ const YouTubeIcon = ( props ) => (
     stroke="currentColor"
     className="w-6 h-6"
   >
-    <rect x="2" y="5" width="20" height="14" rx="4" ry="4" stroke="#FF0000" strokeWidth={ 2 } fill="#FF0000" />
-    <path d="M10 8l6 4-6 4V8z" fill="white" />
+    <path d="M9 12a4 4 0 1 0 4 4V8a5 5 0 0 0 5-5" fill="none" stroke="#ff0050" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
@@ -173,11 +172,12 @@ const tools = [
     color: 'edit',
   },
   {
-    icon: YouTubeIcon,
-    title: 'Download from YouTube',
-    description: 'Download videos directly from YouTube.',
-    href: '/tools/download-youtube',
+    icon: TikTokIcon,
+    title: 'Download TikTok Video',
+    description: 'Download TikTok videos without watermark.',
+    href: '/tools/tiktok-download',
     color: 'download',
+    inputType: 'url',
   }
 
 

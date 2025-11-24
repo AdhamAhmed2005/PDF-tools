@@ -9,18 +9,46 @@ import sql from 'mssql';
 export async function POST ( request, { params } ) {
   try
   {
-    const form = await request.formData();
-    const files = form.getAll( 'files' );
-    const toolFromForm = form.get( 'tool' );
-    const tool = toolFromForm || params?.tool || 'unknown';
-    const userId = form.get( 'user_id' );
-    if ( !files || !files.length )
-    {
-      return new Response( JSON.stringify( { success: false, message: 'No files uploaded' } ), { status: 400 } );
+    const contentType = request.headers.get('content-type');
+    let tool, files, options = {}, userId;
+    
+    if (contentType?.includes('application/json')) {
+      // Handle URL-based tools (JSON payload)
+      const body = await request.json();
+      tool = body.tool || params?.tool || 'unknown';
+      userId = body.user_id;
+      
+      if (!body.url) {
+        return new Response( JSON.stringify( { success: false, message: 'No URL provided' } ), { status: 400 } );
+      }
+      
+      // For URL tools, we pass the URL as the "file" data
+      files = [{ url: body.url, name: 'url_input' }];
+      options = body.options || {};
+    } else {
+      // Handle file-based tools (FormData)
+      const form = await request.formData();
+      files = form.getAll( 'files' );
+      const toolFromForm = form.get( 'tool' );
+      tool = toolFromForm || params?.tool || 'unknown';
+      userId = form.get( 'user_id' );
+      
+      if ( !files || !files.length )
+      {
+        return new Response( JSON.stringify( { success: false, message: 'No files uploaded' } ), { status: 400 } );
+      }
+      
+      const angleField = form.get( 'angle' );
+      const optionsField = form.get( 'options' );
+      if ( optionsField )
+      {
+        try { options = JSON.parse( String( optionsField ) ); } catch ( e ) { }
+      }
+      if ( angleField && !options.angle ) options.angle = Number( angleField );
     }
 
   // Identify client by IP + token using shared helper
-  const { ip, token } = getClientInfo(request, form);
+  const { ip, token } = getClientInfo(request, null);
   const LIMIT = 5;
   const allowed = await canUse(ip, token, LIMIT);
   const remainingBefore = await remaining(ip, token, LIMIT);
@@ -29,16 +57,7 @@ export async function POST ( request, { params } ) {
     }
 
     try {
-      let options = {};
-      const angleField = form.get( 'angle' );
-      const optionsField = form.get( 'options' );
-      if ( optionsField )
-      {
-        try { options = JSON.parse( String( optionsField ) ); } catch ( e ) { }
-      }
-      if ( angleField && !options.angle ) options.angle = Number( angleField );
-
-  const result = await processFilesForTool( tool, files, options );
+      const result = await processFilesForTool( tool, files, options );
   const payload = result?.result;
 
       let toolId = null;
