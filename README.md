@@ -35,7 +35,26 @@ ARB_MERCHANT_ID=your_merchant_id_here
 ARB_PASSWORD=your_password_here
 ARB_API_URL=https://securepayments.alrajhibank.com.sa/pg/payment/hosted.htm
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
+NEXT_PUBLIC_ADSENSE_CLIENT_ID=ca-pub-your-client-id
+NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP=0000000000
+NEXT_PUBLIC_ADSENSE_SLOT_HOME_MID=0000000000
+NEXT_PUBLIC_ADSENSE_SLOT_TOOL_PAGE=0000000000
+YOUTUBE_API_BASE_URL=http://localhost:8000
 ```
+
+AdSense ads only render when the client ID and a slot are configured. Set each slot to match the unit IDs you create inside your AdSense account (reusing the same slot across pages is fine).
+
+`YOUTUBE_API_BASE_URL` points to the external service that fetches/merges YouTube videos. During development it defaults to a local instance on port 8000—set it to your production host when deploying.
+
+### Async downloader workflow
+
+YouTube downloads now run as background jobs:
+
+1. `lib/tools/youtube-download.js` POSTs `/youtube/download?url=...` to the service configured by `YOUTUBE_API_BASE_URL`. The server responds immediately with `{ process_id }`.
+2. The Next.js proxy routes `app/api/download-jobs/[processId]/route.js` and `app/api/download-jobs/[processId]/file/route.js` call `/downloads/{process_id}` and `/downloads/{process_id}/file` so the client avoids CORS issues.
+3. `UrlToolRunner` detects the returned job info, polls the status route for `status`/`progress`, and displays a progress bar until the server reports `status === "completed"`, then streams the finished file through the proxy.
+
+If the remote job reports `status === "failed"`, the error string from the downloader is surfaced directly to the user.
 
 3. **Run development server**
 

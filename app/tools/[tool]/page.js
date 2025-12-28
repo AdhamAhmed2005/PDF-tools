@@ -1,6 +1,9 @@
 import FileUploadWithProgress from '@/components/FileUploadWithProgress';
 import UrlToolRunner from '@/components/UrlToolRunner';
+import GoogleAd from '@/components/GoogleAd';
 import tools from '@/data/tools';
+
+const TOOL_PAGE_AD_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT_TOOL_PAGE;
 
 const ToolPage = async ({ params }) => {
 const resolvedParams = await params;       
@@ -22,6 +25,11 @@ const isUrlTool = toolConfig?.inputType === 'url';
                         }
                     </p>
                 </header>
+                {TOOL_PAGE_AD_SLOT && (
+                    <div className="max-w-4xl mx-auto py-6">
+                        <GoogleAd slot={TOOL_PAGE_AD_SLOT} style={{ minHeight: 90 }} />
+                    </div>
+                )}
 
                 {isUrlTool ? (
                     <UrlToolRunner tool={tool} />

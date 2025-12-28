@@ -4,6 +4,9 @@ import React, { useMemo, useState } from "react";
 import ToolList from "@/data/tools";
 import ToolCard from "@/components/ToolCard";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import GoogleAd from "@/components/GoogleAd";
+
+const TOOLS_PAGE_AD_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT_TOOL_PAGE;
 
 export default function ToolsPage () {
     const [ query, setQuery ] = useState( "" );
@@ -116,6 +119,11 @@ export default function ToolsPage () {
                     </div>
                 </div>
             </header>
+            {TOOLS_PAGE_AD_SLOT && (
+                <div className="max-w-4xl mx-auto px-6 md:px-10 py-8">
+                    <GoogleAd slot={TOOLS_PAGE_AD_SLOT} style={{ minHeight: 90 }} />
+                </div>
+            )}
 
             <main className="max-w-6xl mx-auto px-6 md:px-10 py-10">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">

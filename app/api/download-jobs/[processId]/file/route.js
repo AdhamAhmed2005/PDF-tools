@@ -1,0 +1,68 @@
+export const runtime = 'nodejs';
+
+import { env as processEnv } from 'node:process';
+
+const DEFAULT_API_BASE = 'http://localhost:8000';
+const API_BASE = (processEnv?.YOUTUBE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/$/, '');
+
+export async function GET(request, { params }) {
+  const resolved = await params;
+  const processId = resolved?.processId;
+  if (!processId) {
+    return Response.json({ success: false, message: 'Missing process ID' }, { status: 400 });
+  }
+
+  try {
+    const upstream = await fetch(`${API_BASE}/downloads/${encodeURIComponent(processId)}/file`, {
+      cache: 'no-store',
+    });
+
+    if (!upstream.ok) {
+      const errorBody = await parseError(upstream);
+      const message = errorBody || `Remote server responded with status ${upstream.status}`;
+      return Response.json({ success: false, message }, { status: upstream.status });
+    }
+
+    const arrayBuffer = await upstream.arrayBuffer();
+    const headers = new Headers();
+
+    const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+    const disposition =
+      upstream.headers.get('content-disposition') ||
+      `attachment; filename="youtube-download-${processId}.mp4"`;
+
+    headers.set('Content-Type', contentType);
+    headers.set('Content-Disposition', disposition);
+    headers.set('Cache-Control', 'no-store');
+    const contentLength = upstream.headers.get('content-length');
+    if (contentLength) {
+      headers.set('Content-Length', contentLength);
+    }
+
+    return new Response(arrayBuffer, { status: 200, headers });
+  } catch (error) {
+    console.error('download job file error:', error);
+    return Response.json(
+      { success: false, message: error?.message || 'Failed to fetch download file' },
+      { status: 500 }
+    );
+  }
+}
+
+async function parseError(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    try {
+      const data = await response.json();
+      return data?.message || data?.detail || data?.error || null;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    return await response.text();
+  } catch {
+    return null;
+  }
+}

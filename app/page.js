@@ -8,6 +8,10 @@ import Hero from "@/components/Hero";
 import Link from "next/link";
 import Benifits from "@/components/Benifits";
 import ClientReview from "@/components/ClientReview";
+import GoogleAd from "@/components/GoogleAd";
+
+const HERO_AD_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP;
+const MIDPAGE_AD_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_MID;
 
 export default function Home() {
   const [query, setQuery] = useState("");
@@ -29,7 +33,13 @@ export default function Home() {
     <div className="min-h-screen bg-white">
       <Hero query={query} setQuery={setQuery} />
 
-      <Benifits/>
+      {HERO_AD_SLOT && (
+        <div className="max-w-5xl mx-auto px-6 md:px-10 lg:px-16 py-6">
+          <GoogleAd slot={HERO_AD_SLOT} style={{ minHeight: 90 }} />
+        </div>
+      )}
+
+      <Benifits />
 
       <section id="tools" className="pb-16">
         <div className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16">
@@ -95,7 +105,12 @@ export default function Home() {
           </div>
         </div>
       </section>
-<ClientReview/>
+      {MIDPAGE_AD_SLOT && (
+        <div className="max-w-5xl mx-auto px-6 md:px-10 lg:px-16 py-10">
+          <GoogleAd slot={MIDPAGE_AD_SLOT} style={{ minHeight: 90 }} />
+        </div>
+      )}
+      <ClientReview />
       <Footer />
     </div>
   );

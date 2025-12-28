@@ -1,12 +1,243 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { LinkIcon, ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 
 export default function UrlToolRunner({ tool }) {
   const [url, setUrl] = useState("");
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
+  const [jobInfo, setJobInfo] = useState(null);
+  const [jobStatus, setJobStatus] = useState(null);
+  const [jobProgress, setJobProgress] = useState(0);
+  const [jobProgressKnown, setJobProgressKnown] = useState(false);
+  const [jobDetail, setJobDetail] = useState("");
+  const [downloadReadyJob, setDownloadReadyJob] = useState(null);
+  const [downloadInProgress, setDownloadInProgress] = useState(false);
+  const [manualDownloadData, setManualDownloadData] = useState(null);
+  const jobPollRef = useRef(null);
+  const showIndeterminate = !jobProgressKnown && !["completed", "failed", "error"].includes(jobStatus);
+
+  useEffect(() => {
+    return () => {
+      if (jobPollRef.current) {
+        clearInterval(jobPollRef.current);
+      }
+    };
+  }, []);
+
+  const cleanupJobPolling = () => {
+    if (jobPollRef.current) {
+      clearInterval(jobPollRef.current);
+      jobPollRef.current = null;
+    }
+  };
+
+  const downloadJobFile = async (job, suggestedFilename) => {
+    const endpoint =
+      job?.fileUrl ||
+      (job?.id ? `/api/download-jobs/${job.id}/file` : job?.jobId ? `/api/download-jobs/${job.jobId}/file` : null);
+
+    if (!endpoint) {
+      throw new Error("Missing download endpoint for job.");
+    }
+
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      let errorMessage = `Download failed with status ${response.status}`;
+      try {
+        const data = await response.json();
+        errorMessage = data?.message || errorMessage;
+      } catch {
+        // ignore parse errors
+      }
+      throw new Error(errorMessage);
+    }
+
+    const blob = await response.blob();
+    let filename = suggestedFilename || job?.filename || "download";
+    const disposition = response.headers.get("content-disposition");
+    if (disposition) {
+      const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/);
+      const [, utfName, asciiName] = match || [];
+      const decodedName = utfName ? decodeURIComponent(utfName) : asciiName;
+      if (decodedName) {
+        filename = decodedName;
+      }
+    }
+
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  };
+
+  const handleManualDownload = async () => {
+    if (!manualDownloadData) return;
+    setDownloadInProgress(true);
+    setMessage("Downloading...");
+    try {
+      if (manualDownloadData.type === "job") {
+        await downloadJobFile(manualDownloadData.job, manualDownloadData.filename);
+      } else if (manualDownloadData.type === "url") {
+        const link = document.createElement("a");
+        link.href = manualDownloadData.downloadUrl;
+        link.download = manualDownloadData.filename || "download";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (manualDownloadData.type === "blob" && manualDownloadData.blob) {
+        const url = window.URL.createObjectURL(manualDownloadData.blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = manualDownloadData.filename || "download";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+      setMessage("✓ Download started!");
+    } catch (error) {
+      console.error("Download error:", error);
+      setMessage(`Error: ${error.message}`);
+    } finally {
+      setDownloadInProgress(false);
+    }
+  };
+
+  const clampPercentage = (value) => Math.min(100, Math.max(0, value));
+
+  const extractJobProgress = (jobPayload) => {
+    if (!jobPayload) {
+      return { progress: 0, known: false };
+    }
+
+    const rawProgress = jobPayload.progress;
+    if (rawProgress !== undefined && rawProgress !== null) {
+      const numericProgress = Number(rawProgress);
+      if (Number.isFinite(numericProgress)) {
+        if (numericProgress > 0 || jobPayload.downloadReady || jobPayload.status === "completed") {
+          return { progress: clampPercentage(numericProgress), known: true };
+        }
+        return { progress: 0, known: false };
+      }
+    }
+
+    const bytesDownloaded = Number(
+      jobPayload.bytesDownloaded ?? jobPayload.bytes_downloaded ?? jobPayload.downloadedBytes ?? jobPayload.downloaded_bytes
+    );
+    const totalBytes = Number(jobPayload.totalBytes ?? jobPayload.total_bytes ?? jobPayload.total);
+
+    if (Number.isFinite(bytesDownloaded) && Number.isFinite(totalBytes) && totalBytes > 0) {
+      return { progress: clampPercentage((bytesDownloaded / totalBytes) * 100), known: true };
+    }
+
+    return { progress: 0, known: false };
+  };
+
+  const pollJobStatus = async (job) => {
+    const statusEndpoint =
+      job?.statusUrl ||
+      (job?.id ? `/api/download-jobs/${job.id}` : job?.jobId ? `/api/download-jobs/${job.jobId}` : null);
+
+    if (!statusEndpoint) {
+      throw new Error("Missing job status endpoint.");
+    }
+
+    const response = await fetch(statusEndpoint, { cache: "no-store" });
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => ({}));
+      throw new Error(errorPayload?.message || `Status error ${response.status}`);
+    }
+
+    const payload = await response.json();
+    if (!payload.success) {
+      throw new Error(payload?.message || "Failed to fetch job status.");
+    }
+
+    const jobPayload = payload.job || {};
+    const { progress, known } = extractJobProgress(jobPayload);
+    if (known) {
+      setJobProgress(progress);
+      setJobProgressKnown(true);
+    }
+    if (jobPayload.status) {
+      setJobStatus(jobPayload.status);
+    }
+    if (jobPayload.message) {
+      setJobDetail(jobPayload.message);
+    }
+
+    if (jobPayload.error) {
+      cleanupJobPolling();
+      setProcessing(false);
+      setJobInfo(null);
+      setMessage(`Error: ${jobPayload.message || "Download failed"}`);
+      setDownloadReadyJob(null);
+      setDownloadInProgress(false);
+      setManualDownloadData(null);
+      return false;
+    }
+
+    if (jobPayload.downloadReady || jobPayload.status === "completed") {
+      cleanupJobPolling();
+      setProcessing(false);
+      setJobProgress(100);
+      setJobProgressKnown(true);
+      setJobStatus("completed");
+      setJobDetail(jobPayload.message || "Download ready");
+      setDownloadReadyJob({
+        job,
+        filename: jobPayload.filename || job?.filename || job?.suggestedFilename,
+      });
+      setManualDownloadData({
+        type: "job",
+        job,
+        filename: jobPayload.filename || job?.filename || job?.suggestedFilename,
+      });
+      setMessage("✓ Download ready! Click the button below to download.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const startJobTracking = (job, initialMessage) => {
+    setDownloadReadyJob(null);
+    setDownloadInProgress(false);
+    setJobInfo(job);
+    setJobStatus("queued");
+    setJobProgress(0);
+    setJobProgressKnown(false);
+    setJobDetail(initialMessage || "Preparing download...");
+    setMessage("");
+    setManualDownloadData(null);
+
+    cleanupJobPolling();
+
+    const poll = async () => {
+      try {
+        const shouldContinue = await pollJobStatus(job);
+        if (!shouldContinue) {
+          return;
+        }
+      } catch (error) {
+        cleanupJobPolling();
+        setProcessing(false);
+        setJobStatus("error");
+        setMessage(`Error: ${error.message}`);
+        setDownloadReadyJob(null);
+        setDownloadInProgress(false);
+      }
+    };
+
+    poll();
+    jobPollRef.current = window.setInterval(poll, 2000);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,7 +247,6 @@ export default function UrlToolRunner({ tool }) {
       return;
     }
 
-    // Basic URL validation
     try {
       new URL(url);
     } catch {
@@ -24,8 +254,20 @@ export default function UrlToolRunner({ tool }) {
       return;
     }
 
+    cleanupJobPolling();
+    setJobInfo(null);
+    setJobProgress(0);
+    setJobProgressKnown(false);
+    setJobStatus(null);
+    setJobDetail("");
+    setDownloadReadyJob(null);
+    setDownloadInProgress(false);
+    setManualDownloadData(null);
+
     setProcessing(true);
     setMessage("");
+
+    let jobStarted = false;
 
     try {
       const response = await fetch(`/api/tools/${tool}/fileprocess`, {
@@ -44,23 +286,28 @@ export default function UrlToolRunner({ tool }) {
         throw new Error(errorData.message || `Server error: ${response.status}`);
       }
 
-      // Check if response is JSON or binary
       const contentType = response.headers.get("content-type");
       
       if (contentType?.includes("application/json")) {
-        // JSON response with success/error info
         const data = await response.json();
         if (data.success) {
-          // Check if there's a download URL
-          if (data.result?.downloadUrl) {
-            // Trigger download from the provided URL
-            const link = document.createElement("a");
-            link.href = data.result.downloadUrl;
-            link.download = data.result.filename || "download";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setMessage("✓ Download started!");
+          const downloadResult = data.result;
+          if ((tool === "youtube-download" || tool === "tiktok-download") && downloadResult?.job) {
+            jobStarted = true;
+            startJobTracking(downloadResult.job, data.message || downloadResult.message);
+            return;
+          }
+
+          setDownloadReadyJob(null);
+          setManualDownloadData(null);
+
+          if (downloadResult?.downloadUrl) {
+            setManualDownloadData({
+              type: "url",
+              downloadUrl: downloadResult.downloadUrl,
+              filename: downloadResult.filename || "download",
+            });
+            setMessage("✓ Download ready! Click the button below to download.");
           } else {
             setMessage("✓ Processing completed successfully!");
           }
@@ -68,7 +315,6 @@ export default function UrlToolRunner({ tool }) {
           setMessage(`Error: ${data.message || "Processing failed"}`);
         }
       } else {
-        // Binary response - download file
         const blob = await response.blob();
         const contentDisposition = response.headers.get("content-disposition");
         let filename = "download";
@@ -80,35 +326,46 @@ export default function UrlToolRunner({ tool }) {
           }
         }
 
-        // Create download link
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = downloadUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(downloadUrl);
-
-        setMessage("✓ Download started!");
+        setDownloadReadyJob(null);
+        setManualDownloadData({
+          type: "blob",
+          blob,
+          filename,
+          contentType: response.headers.get("content-type") || "application/octet-stream",
+        });
+        setMessage("✓ Download ready! Click the button below to download.");
       }
     } catch (error) {
       console.error("Processing error:", error);
+      cleanupJobPolling();
+      setJobInfo(null);
+      setJobStatus(null);
+      setJobDetail("");
       setMessage(`Error: ${error.message}`);
     } finally {
-      setProcessing(false);
+      if (!jobStarted) {
+        setProcessing(false);
+      }
     }
   };
 
   const handleClear = () => {
     setUrl("");
     setMessage("");
+    cleanupJobPolling();
+    setJobInfo(null);
+    setJobStatus(null);
+    setJobProgress(0);
+    setJobProgressKnown(false);
+    setJobDetail("");
+    setDownloadReadyJob(null);
+    setDownloadInProgress(false);
+    setProcessing(false);
   };
 
   return (
     <div className="max-w-2xl mx-auto">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* URL Input Area */}
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-teal-400 transition-colors">
           <LinkIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           
@@ -121,14 +378,13 @@ export default function UrlToolRunner({ tool }) {
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://www.tiktok.com/@username/video/1234567890"
+              placeholder="https://www.youtube.com/watch?v=... or https://www.tiktok.com/@..."
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               disabled={processing}
             />
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex gap-4">
           <button
             type="submit"
@@ -158,22 +414,73 @@ export default function UrlToolRunner({ tool }) {
           </button>
         </div>
 
-        {/* Status Message */}
+        {jobInfo && (
+          <div className="space-y-3 rounded-lg border border-gray-200 p-4 bg-white shadow-sm">
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <span className="font-medium text-gray-800">Download progress</span>
+              <span>{jobProgressKnown ? `${Math.round(jobProgress)}%` : "..."}</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+              <div
+                className={`h-full bg-teal-500 transition-all duration-300 ease-out ${
+                  showIndeterminate ? "animate-pulse" : ""
+                }`}
+                style={{
+                  width: jobProgressKnown
+                    ? `${clampPercentage(Math.round(jobProgress))}%`
+                    : showIndeterminate
+                      ? "100%"
+                      : "0%",
+                }}
+              />
+            </div>
+            <p className="text-sm text-gray-600">
+              Status: <span className="font-semibold text-gray-800 capitalize">{jobStatus || "starting"}</span>
+            </p>
+            {jobDetail && <p className="text-sm text-gray-500">{jobDetail}</p>}
+            {downloadReadyJob && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleManualDownload}
+                  disabled={downloadInProgress}
+                  className="bg-teal-600 text-white py-2 px-4 rounded-md hover:bg-teal-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                  {downloadInProgress ? "Downloading..." : "Download Video"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {message && (
-          <div className={`p-4 rounded-md ${
-            message.startsWith("✓") 
-              ? "bg-green-50 text-green-800 border border-green-200" 
-              : "bg-red-50 text-red-800 border border-red-200"
-          }`}>
+          <div
+            className={`p-4 rounded-md ${
+              message.startsWith("✓")
+                ? "bg-green-50 text-green-800 border border-green-200"
+                : "bg-red-50 text-red-800 border border-red-200"
+            }`}
+          >
             {message}
+          </div>
+        )}
+        {manualDownloadData && manualDownloadData.type !== "job" && (
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={handleManualDownload}
+              disabled={downloadInProgress}
+              className="bg-teal-600 text-white py-2 px-4 rounded-md hover:bg-teal-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {downloadInProgress ? "Downloading..." : "Download Video"}
+            </button>
           </div>
         )}
       </form>
 
-      {/* Help Text */}
       <div className="mt-8 text-sm text-gray-500 text-center">
-        <p>Supported platforms: TikTok</p>
-        <p>Downloads videos without watermarks when available</p>
+        <p>Supported platforms: TikTok, YouTube</p>
+        <p>Downloads videos in HD quality when available</p>
       </div>
     </div>
   );
