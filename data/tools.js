@@ -26,17 +26,17 @@ import {
   CameraIcon,
 } from '@heroicons/react/24/outline';
 
-const YouTubeIcon = ( props ) => (
-  <svg
-    { ...props }
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    className="w-6 h-6"
-  >
-    <path d="M21.8 8.001a2.75 2.75 0 0 0-1.94-1.946C18.2 5.6 12 5.6 12 5.6s-6.2 0-7.86.455A2.75 2.75 0 0 0 2.2 8.001 29.4 29.4 0 0 0 2 12a29.4 29.4 0 0 0 .2 3.999 2.75 2.75 0 0 0 1.94 1.946C5.8 18.4 12 18.4 12 18.4s6.2 0 7.86-.455a2.75 2.75 0 0 0 1.94-1.946A29.4 29.4 0 0 0 22 12a29.4 29.4 0 0 0-.2-3.999zM10 15.25v-6.5L15 12l-5 3.25z" />
-  </svg>
-);
+// const YouTubeIcon = ( props ) => (
+//   <svg
+//     { ...props }
+//     xmlns="http://www.w3.org/2000/svg"
+//     viewBox="0 0 24 24"
+//     fill="currentColor"
+//     className="w-6 h-6"
+//   >
+//     <path d="M21.8 8.001a2.75 2.75 0 0 0-1.94-1.946C18.2 5.6 12 5.6 12 5.6s-6.2 0-7.86.455A2.75 2.75 0 0 0 2.2 8.001 29.4 29.4 0 0 0 2 12a29.4 29.4 0 0 0 .2 3.999 2.75 2.75 0 0 0 1.94 1.946C5.8 18.4 12 18.4 12 18.4s6.2 0 7.86-.455a2.75 2.75 0 0 0 1.94-1.946A29.4 29.4 0 0 0 22 12a29.4 29.4 0 0 0-.2-3.999zM10 15.25v-6.5L15 12l-5 3.25z" />
+//   </svg>
+// );
 
 
 const YouTubeIcon = ( props ) => (
@@ -197,14 +197,6 @@ const tools = [
     description: 'Draw, type, or upload a signature.',
     href: '/tools/sign-pdf',
     color: 'edit',
-  },
-  {
-    icon: YouTubeIcon,
-    title: 'Download YouTube Video',
-    description: 'Download YouTube videos in different qualities.',
-    href: '/tools/youtube-download',
-    color: 'download',
-    inputType: 'url',
   },
   {
     icon: TikTokIcon,
