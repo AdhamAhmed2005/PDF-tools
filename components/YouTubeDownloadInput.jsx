@@ -63,7 +63,7 @@ export default function YouTubeDownloadInput() {
       link.remove();
 
       setSuccess("Download started!");
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message || "Error downloading video.");
     } finally {
       setLoading(false);
