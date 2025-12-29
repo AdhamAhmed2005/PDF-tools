@@ -1,4 +1,4 @@
-import SignupForm from '@/components/SignupForm';
+import SignupForm from '@/features/auth/ui/SignupForm';
 
 export const metadata = {
   title: 'Sign Up - PDFCentral',
@@ -42,4 +42,3 @@ export default function SignupPage() {
 	</div>
   );
 }
-

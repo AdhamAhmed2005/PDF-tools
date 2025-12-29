@@ -1,9 +1,9 @@
 export const runtime = 'nodejs';
 
-import { processFilesForTool } from '@/lib/tools/processor';
-import { canUse, incrementUsage, remaining } from '@/lib/server/usage-db';
-import { getClientInfo } from '@/actions/getClientInfo';
-import { getConnection } from '@/lib/database';
+import { processFilesForTool } from '@/features/tools/server/processor';
+import { canUse, incrementUsage, remaining } from '@/lib/usage/usage-db';
+import { getClientInfo } from '@/shared/utils/getClientInfo';
+import { getConnection } from '@/lib/db';
 import sql from 'mssql';
 
 export async function POST ( request, { params } ) {

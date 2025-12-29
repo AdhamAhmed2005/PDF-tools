@@ -1,5 +1,5 @@
 import React from 'react';
-import ContentPage from '@/components/ContentPage';
+import ContentPage from '@/features/content/ui/ContentPage';
 
 export const metadata = {
   title: 'Privacy Policy | PDF-tools',

@@ -4,7 +4,7 @@
 export const runtime = 'nodejs';
 
 import { generatePaymentToken, generateTrackId } from '@/lib/payment/arb-gateway';
-import { getClientInfo } from '@/actions/getClientInfo';
+import { getClientInfo } from '@/shared/utils/getClientInfo';
 import { promises as fs } from 'fs';
 import path from 'path';
 

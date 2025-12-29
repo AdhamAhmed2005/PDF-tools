@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import Footer from "@/components/Footer";
+import Footer from "@/shared/ui/Footer";
 
 export default function About() {
   const team = [

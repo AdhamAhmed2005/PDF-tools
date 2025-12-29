@@ -1,6 +1,6 @@
 import React from "react";
-import Footer from "@/components/Footer";
-import ContactForm from "@/components/ContactForm";
+import Footer from "@/shared/ui/Footer";
+import ContactForm from "@/features/contact/ui/ContactForm";
 import Link from "next/link";
 
 export default function ContactPage() {
@@ -10,7 +10,7 @@ export default function ContactPage() {
         <header className="text-center">
           <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900">Contact us</h1>
           <p className="mt-3 text-gray-600">
-            Have a question, feedback, or a feature request? Send us a message and we'll get back to you.
+            Have a question, feedback, or a feature request? Send us a message and we&apos;ll get back to you.
           </p>
         </header>
 

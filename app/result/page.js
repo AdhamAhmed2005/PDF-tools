@@ -4,8 +4,8 @@
 //   /result?status=success&filename=myfile.pdf&url=/api/download/abc123        (after conversion)
 //   /result?status=error&message=Rotate%20failed                              (on error)
 
-import ConversionResult from '@/components/ConversionResult';
-import FilePreviewWithConvert from '@/components/FilePreviewWithConvert';
+import ConversionResult from '@/features/results/ui/ConversionResult';
+import FilePreviewWithConvert from '@/features/results/ui/FilePreviewWithConvert';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;

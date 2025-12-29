@@ -1,5 +1,5 @@
 import React from 'react';
-import ContentPage from '@/components/ContentPage';
+import ContentPage from '@/features/content/ui/ContentPage';
 
 export const metadata = {
   title: 'Terms of Use | PDF-tools',
@@ -48,7 +48,7 @@ export default function TermsPage() {
 
       <h2>Limitation of liability</h2>
       <p>
-        Our tools are provided on an "as is" basis without warranties of any kind. To the maximum extent permitted by law, we are not liable
+        Our tools are provided on an &quot;as is&quot; basis without warranties of any kind. To the maximum extent permitted by law, we are not liable
         for any indirect or consequential damages arising from use of the service.
       </p>
 

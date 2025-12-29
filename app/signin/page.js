@@ -1,5 +1,5 @@
 
-import SigninForm from '@/components/SigninForm';
+import SigninForm from '@/features/auth/ui/SigninForm';
 
 // app/signin/page.jsx
 export const metadata = {

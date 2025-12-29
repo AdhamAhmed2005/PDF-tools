@@ -1,110 +1,42 @@
-"use client";
-import React, { useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import Footer from "@/components/Footer";
-import ToolList from "@/data/tools";
-import ToolCard from "@/components/ToolCard";
-import Hero from "@/components/Hero";
-import Link from "next/link";
-import Benifits from "@/components/Benifits";
-import ClientReview from "@/components/ClientReview";
-import GoogleAd from "@/components/GoogleAd";
+import React from "react";
+import Footer from "@/shared/ui/Footer";
+import Benefits from "@/features/home/ui/Benefits";
+import ClientReview from "@/features/home/ui/ClientReview";
+import GoogleAd from "@/shared/ui/GoogleAd";
+import HomePageClient from "@/features/home/ui/HomePageClient";
 
 const HERO_AD_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP;
 const MIDPAGE_AD_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_MID;
 
+export const metadata = {
+  title: "PDF Tools | Fast conversions and downloads",
+  description:
+    "Premium-first PDF toolkit for conversions, compression, and video downloads. Find the right tool in seconds.",
+};
+
 export default function Home() {
-  const [query, setQuery] = useState("");
-
-  const filteredTools = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return ToolList;
-    return ToolList.filter((t) => {
-      const haystack = `${t.title} ${t.description} ${t.href}`.toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [query]);
-
-  // Only show a small curated set on the landing page when there's no search query
-  const featuredTools = useMemo(() => ToolList.slice(0, 8), []);
-  const displayTools = query ? filteredTools : featuredTools;
-
   return (
-    <div className="min-h-screen bg-white">
-      <Hero query={query} setQuery={setQuery} />
+    <div
+      className="min-h-screen bg-[color:var(--page-bg)] text-[color:var(--ink)] font-[var(--font-body)]"
+      style={{
+        "--page-bg": "#f8fafc",
+        "--ink": "#0f172a",
+        "--muted": "#475569",
+        "--accent": "#f97316",
+        "--accent-2": "#14b8a6",
+        "--surface": "#ffffff",
+        "--font-display": '"Fraunces", "Georgia", serif',
+        "--font-body": '"Space Grotesk", "Trebuchet MS", sans-serif',
+      }}
+    >
+      <HomePageClient />
 
       {HERO_AD_SLOT && (
         <div className="max-w-5xl mx-auto px-6 md:px-10 lg:px-16 py-6">
           <GoogleAd slot={HERO_AD_SLOT} style={{ minHeight: 90 }} />
         </div>
       )}
-
-      <Benifits />
-
-      <section id="tools" className="pb-16">
-        <div className="max-w-7xl mx-auto px-6 md:px-10 lg:px-16">
-          <div className="mb-5 flex items-end justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-teal-700">
-                Tools
-              </p>
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-                {query ? "Search results" : "Popular tools"}
-              </h2>
-            </div>
-            <div className="hidden md:flex items-center gap-4">
-              <p className="text-sm text-gray-500">
-                {displayTools.length} {displayTools.length === 1 ? "tool" : "tools"}
-              </p>
-              <Link
-                href="/tools"
-                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 hover:border-teal-400 hover:text-teal-700"
-              >
-                Browse all tools
-              </Link>
-            </div>
-          </div>
-
-          {displayTools.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500">
-              No tools match “{query}”. Try a different search.
-            </div>
-          ) : (
-            <div className="flex flex-wrap justify-center gap-6">
-              {displayTools.map((tool, index) => (
-                <motion.div
-                  key={tool.title}
-                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{
-                    duration: 0.5,
-                    delay: index * 0.06,
-                    type: "spring",
-                  }}
-                  whileHover={{ scale: 1.03, y: -3 }}
-                  className="w-full sm:w-72 md:w-64 lg:w-56 xl:w-48"
-                >
-                  <ToolCard
-                    icon={tool.icon}
-                    title={tool.title}
-                    description={tool.description}
-                    href={tool.href}
-                    color={tool.color}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          )}
-          <div className="mt-6 md:hidden">
-            <Link
-              href="/tools"
-              className="block w-full text-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:border-teal-400 hover:text-teal-700"
-            >
-              Browse all tools
-            </Link>
-          </div>
-        </div>
-      </section>
+      <Benefits />
       {MIDPAGE_AD_SLOT && (
         <div className="max-w-5xl mx-auto px-6 md:px-10 lg:px-16 py-10">
           <GoogleAd slot={MIDPAGE_AD_SLOT} style={{ minHeight: 90 }} />

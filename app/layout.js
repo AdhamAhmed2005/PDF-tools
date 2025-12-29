@@ -1,7 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import Navbar from "@/shared/ui/Navbar";
 
 const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 export const metadata = {

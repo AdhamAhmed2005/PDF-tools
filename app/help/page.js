@@ -1,5 +1,5 @@
 import React from 'react';
-import ContentPage from '@/components/ContentPage';
+import ContentPage from '@/features/content/ui/ContentPage';
 import Link from 'next/link';
 
 export const metadata = {
@@ -16,7 +16,7 @@ export default function HelpPage() {
       <div className="bg-blue-50 border-l-4 border-blue-400 p-6 mb-8">
         <h3 className="text-lg font-semibold text-blue-800 mb-2">Need quick help?</h3>
         <p className="text-blue-700">
-          Check our FAQ below or reach out to our support team. We're here to help you get the most out of PDF-tools.
+          Check our FAQ below or reach out to our support team. We&apos;re here to help you get the most out of PDF-tools.
         </p>
       </div>
 
