@@ -13,67 +13,53 @@ export async function process ( files, options = {} ) {
         throw new Error( 'Only PDF files are supported' );
     }
 
+    const convertTo = options.convertTo || 'word';
+    const extension = convertTo === 'excel' ? 'xlsx' : 'docx';
 
-
-    const clientId = 'f8913c2f-7f0a-4e96-b357-56c4202c77e5';
-    const clientSecret = '300ca2ccf2940f799ea61deb76217606';
-
-
-    const tokenResponse = await axios.post(
-        'https://api.aspose.cloud/connect/token',
-        new URLSearchParams( {
-            grant_type: 'client_credentials',
-            client_id: clientId,
-            client_secret: clientSecret
-        } ),
+    const processResponse = await axios.post(
+        'http://localhost:8000/pdf-convert',
         {
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        }
-    );
-    const accessToken = tokenResponse.data.access_token;
-
-    // رفع الملف إلى التخزين الافتراضي
-    await axios.put(
-        `https://api.aspose.cloud/v3.0/pdf/storage/file/${ encodeURIComponent( originalName ) }`,
-        file.buffer,
+            filename: originalName,
+            file: file.buffer,
+            contentType: file.type || 'application/pdf',
+            convertTo: convertTo
+        },
         {
             headers: {
-                Authorization: `Bearer ${ accessToken }`,
-                'Content-Type': 'application/pdf'
+                'Content-Type': 'multipart/form-data'
             }
         }
     );
 
-    // اسم ملف التحويل النهائي داخل التخزين
-    const outputName = 'converted/' + originalName.replace( /\.pdf$/i, '.docx' );
+    const processId = processResponse.data.processId;
 
-    // نفذ التحويل في Aspose (العملية نفسها تحفظ الملف الناتج على التخزين في هذا المسار)
-    await axios.put(
-        `https://api.aspose.cloud/v3.0/pdf/${ encodeURIComponent( originalName ) }/convert/doc?outPath=${ encodeURIComponent( outputName ) }&format=DocX`,
-        null,
+    let jobStatus;
+    while ( true )
+    {
+        const statusResponse = await axios.get(
+            `http://localhost:8000/pdf-convert/${ processId }`
+        );
+        jobStatus = statusResponse.data.job;
+
+        if ( jobStatus.downloadReady || jobStatus.error )
         {
-            headers: {
-                Authorization: `Bearer ${ accessToken }`
-            }
+            break;
         }
-    );
 
-    // تحميل الملف الناتج كما هو من التخزين (بنفس طريقة التنزيل من Dashboard)
-    const downloadResponse = await axios.get(
-        `https://api.aspose.cloud/v3.0/pdf/storage/file/${ encodeURIComponent( outputName ) }`,
-        {
-            headers: {
-                Authorization: `Bearer ${ accessToken }`
-            },
-            responseType: 'arraybuffer'
-        }
-    );
+        await new Promise( resolve => setTimeout( resolve, 1000 ) );
+    }
 
-    // أعد الملف الصحيح كما يظهر من لوحة التحكم
+    if ( jobStatus.error )
+    {
+        throw new Error( jobStatus.message || 'Conversion failed' );
+    }
+
     return {
-        download: true,
-        filename: originalName.replace( /\.pdf$/i, '' ) + '-converted.docx',
-        buffer: Buffer.from( downloadResponse.data ),
-        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        success: true,
+        processId: processId,
+        filename: originalName.replace( /\.pdf$/i, '' ) + `-converted.${ extension }`,
+        convertTo: convertTo,
+        status: jobStatus.status,
+        message: jobStatus.message
     };
 }
